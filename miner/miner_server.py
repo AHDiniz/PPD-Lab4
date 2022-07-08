@@ -33,7 +33,7 @@ def on_message(client, userdata, message):
     data_in = json.loads(message.payload.decode("utf-8"))
     print(data_in)
     data_in = SubmitPayload(**data_in)
-    submit_status = transaction_bo.submit_challenge(data_in)
+    submit_status = transaction_bo.verify_challenge(data_in)
     if (submit_status == SubmitStatus.valido):
         result_out = message.payload
         client.publish("ppd/result",  payload=result_out)

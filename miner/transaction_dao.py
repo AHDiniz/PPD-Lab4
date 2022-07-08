@@ -1,7 +1,6 @@
 from typing import List
 from transaction import Transaction
 from tabulate import tabulate
-import random
 
 transactions: List[Transaction] = []
 
@@ -15,11 +14,10 @@ class TransactionDAO:
         return cls._instance
 
     # add a transaction to the list of transactions
-    def create_transaction(self) -> None:
+    def create_transaction(self, challenge) -> None:
         transaction = Transaction(
-            self.get_last_transaction().transaction_id + 1, random.randint(1, 128), None, -1)
-        transactions.append(transaction)
-        self.print_transactions()
+            self.get_last_transaction().transaction_id + 1, challenge, None, -1)
+        self.add_transaction(transaction)
 
     # get a transaction by id
     def get_transaction(self, transaction_id: int) -> Transaction:
@@ -35,6 +33,11 @@ class TransactionDAO:
                 transaction.seed = seed
                 transaction.winner = winner
                 return transaction
+    
+    # add transaction to the list of transactions
+    def add_transaction(self, transaction: Transaction) -> None:
+        transactions.append(transaction)
+        self.print_transactions()
 
     # get last transaction
     def get_last_transaction(self) -> Transaction:
