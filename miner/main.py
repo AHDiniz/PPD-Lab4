@@ -101,8 +101,12 @@ def callback_election(ch, method, properties, body):
 
 def callback_challenge(ch, method, properties, body):
     global current_challenge
+    c.acquire()
     current_challenge = json.loads(body.decode("utf-8"))
+    current_challenge = Transaction(**current_challenge)
     transaction_bo.add_transaction(current_challenge)
+    c.release()
+    c.notify_all()
 
     print("Transaction received " + str(current_challenge.transaction_id) +
           " with challenge: " + str(current_challenge.challenge))
