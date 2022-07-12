@@ -28,6 +28,12 @@ waiting_vote = False
 
 max_clients = 1
 
+init_channel = 'miner/init'
+election_channel = 'miner/election'
+challenge_channel = 'miner/challenge'
+solution_channel = 'miner/solution'
+voting_channel = 'miner/voting'
+
 c = thrd.Condition()
 
 
@@ -52,22 +58,22 @@ voting: List[VotingMsg] = []
 
 def on_channel_open(channel):
     print("declaring channel queue")
-    channel.queue_declare(queue='miner/init')
-    channel.queue_declare(queue='miner/election')
-    channel.queue_declare(queue='miner/challenge')
-    channel.queue_declare(queue='miner/solution')
-    channel.queue_declare(queue='miner/voting')
+    channel.queue_declare(queue=init_channel)
+    channel.queue_declare(queue=election_channel)
+    channel.queue_declare(queue=challenge_channel)
+    channel.queue_declare(queue=solution_channel)
+    channel.queue_declare(queue=voting_channel)
+    
     channel.basic_consume(on_message_callback=callback_init,
-                          queue='miner/init', auto_ack=True)
-    channel.basic_consume(
-        on_message_callback=callback_election, queue='miner/election', auto_ack=True)
+                            queue=init_channel, auto_ack=True)
+    channel.basic_consume(on_message_callback=callback_election, 
+                            queue=election_channel, auto_ack=True)
     channel.basic_consume(on_message_callback=callback_challenge,
-                          queue='miner/challenge', auto_ack=True)
-    channel.basic_consume(
-        on_message_callback=callback_solution, queue='miner/solution', auto_ack=True)
+                            queue=challenge_channel, auto_ack=True)
+    channel.basic_consume(on_message_callback=callback_solution, 
+                            queue=solution_channel, auto_ack=True)
     channel.basic_consume(on_message_callback=callback_voting,
-                          queue='miner/voting', auto_ack=True)
-
+                            queue=voting_channel, auto_ack=True)
 
 def on_open(connection):
     print("opening connection")
@@ -94,9 +100,11 @@ def callback_init(ch, method, properties, body):
 
 def callback_election(ch, method, properties, body):
     body: ElectionMsg = json.loads(body.decode("utf-8"))
-    if not any(elem.id == body.id for elem in election):
-        print("Client " + str(body.id) + " gets number: " + str(body.vote))
-        clients.append(body)
+    print(" [x] received %r" % body)
+    if not any(elem['id'] == body['id'] for elem in election):
+        print("Client " + str(body["id"]) + " gets number: " + str(body["vote"]))
+        election.append(body)
+    print(election)
 
 
 def callback_challenge(ch, method, properties, body):
@@ -119,14 +127,14 @@ def callback_solution(ch, method, properties, body):
         waiting_vote = True
 
     return_connection().channel().basic_publish(
-        exchange='', routing_key='miner/voting', body=json.dumps(voting, indent=4, cls=CustomEncoder))
+        exchange='', routing_key=voting_channel, body=json.dumps(voting, indent=4, cls=CustomEncoder))
 
 
 def callback_voting(ch, method, properties, body):
     body: VotingMsg = json.loads(body.decode("utf-8"))
-    if not any(elem.id == body.id for elem in election):
+    if not any(elem['id'] == body['id'] for elem in election):
         voting.append(body)
-        print("Client " + str(body.client_id) + " votes: " + str(body.valid))
+        print("Client " + str(body['client_id']) + " votes: " + str(body['valid']))
 
     if (len(voting) == max_clients):
         print("Voting finished")
@@ -137,11 +145,11 @@ def callback_voting(ch, method, properties, body):
             transaction.winner = body.client_id
             transaction.seed = body.payload.seed
 
-            if (max(election, key=lambda x: x.vote).id == local_id):
+            if (max(election, key=lambda x: x['vote'])['id'] == local_id):
                 transaction = transaction_bo.create_transaction()
 
                 return_connection().channel().basic_publish(
-                    exchange='', routing_key='miner/challenge', body=json.dumps(transaction, indent=4, cls=CustomEncoder))
+                    exchange='', routing_key=challenge_channel, body=json.dumps(transaction, indent=4, cls=CustomEncoder))
         else:
             print("Solution invalid")
 
@@ -166,15 +174,15 @@ def main():
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(host='localhost'))
     channel = connection.channel()
-    channel.queue_declare(queue='miner/init')
-    channel.queue_declare(queue='miner/election')
-    channel.queue_declare(queue='miner/challenge')
-    channel.queue_declare(queue='miner/solution')
-    channel.queue_declare(queue='miner/voting')
+    channel.queue_declare(queue=init_channel)
+    channel.queue_declare(queue=election_channel)
+    channel.queue_declare(queue=challenge_channel)
+    channel.queue_declare(queue=solution_channel)
+    channel.queue_declare(queue=voting_channel)
     while len(clients) < max_clients:
         print("Waiting for clients")
         channel.basic_publish(
-            exchange='', routing_key='miner/init', body=str(local_id))
+            exchange='', routing_key=init_channel, body=str(local_id))
         time.sleep(2)
 
     # electing leader
@@ -185,16 +193,16 @@ def main():
     while len(election) < max_clients:
         print("Waiting for election")
         channel.basic_publish(
-            exchange='', routing_key='miner/election', body=json.dumps(vote, indent=4, cls=CustomEncoder))
+            exchange='', routing_key=election_channel, body=json.dumps(vote, indent=4, cls=CustomEncoder))
         time.sleep(2)
 
     print("Election finished")
 
-    if (max(election, key=lambda x: x.vote).id == local_id):
+    if (max(election, key=lambda x: x['vote'])['id'] == local_id):
         print("I am the leader")
         transaction = transaction_bo.create_transaction()
         channel.basic_publish(
-            exchange='', routing_key='miner/challenge', body=json.dumps(transaction, indent=4, cls=CustomEncoder))
+            exchange='', routing_key=challenge_channel, body=json.dumps(transaction, indent=4, cls=CustomEncoder))
 
     print("Running for client id: " + str(local_id))
 
@@ -221,11 +229,11 @@ class SeedCalculator(thrd.Thread):
         self.connection = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost'))
         self.channel = connection.channel()
-        self.channel.queue_declare(queue='miner/init')
-        self.channel.queue_declare(queue='miner/election')
-        self.channel.queue_declare(queue='miner/challenge')
-        self.channel.queue_declare(queue='miner/solution')
-        self.channel.queue_declare(queue='miner/voting')
+        self.channel.queue_declare(queue=init_channel)
+        self.channel.queue_declare(queue=election_channel)
+        self.channel.queue_declare(queue=challenge_channel)
+        self.channel.queue_declare(queue=solution_channel)
+        self.channel.queue_declare(queue=voting_channel)
 
     @property
     def seed(self):
@@ -276,7 +284,7 @@ class SeedCalculator(thrd.Thread):
                 submit_json = json.dumps(submit, indent=4, cls=CustomEncoder)
 
                 self.channel.basic_publish(
-                    exchange='', routing_key='miner/solution', body=submit_json)
+                    exchange='', routing_key=solution_channel, body=submit_json)
 
                 end = perf_counter()
 
@@ -296,6 +304,7 @@ if __name__ == '__main__':
         consumer = Consumer()
         consumer.start()
         main()
+        consumer.join()
     except KeyboardInterrupt:
         print('Interrupted')
         try:
