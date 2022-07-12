@@ -100,7 +100,7 @@ def callback_init(ch, method, properties, body):
 
 def callback_election(ch, method, properties, body):
     body: ElectionMsg = json.loads(body.decode("utf-8"))
-    print(" [x] received %r" % body)
+    print(" [x] callback_eletction: received %r" % body)
     if not any(elem['id'] == body['id'] for elem in election):
         print("Client " + str(body["id"]) + " gets number: " + str(body["vote"]))
         election.append(body)
@@ -109,6 +109,7 @@ def callback_election(ch, method, properties, body):
 
 def callback_challenge(ch, method, properties, body):
     global current_challenge
+    print(" [x] callback_challenge: received %r" % body)
     current_challenge = json.loads(body.decode("utf-8"))
     transaction_bo.add_transaction(current_challenge)
 
@@ -250,6 +251,7 @@ class SeedCalculator(thrd.Thread):
         transaction_id = -1
         while (True):
             global current_challenge
+            # print("SeedCalculator", self.__id, "current challenge :", current_challenge)
 
             # Wait for a challenge
             if (current_challenge is None or waiting_vote):
@@ -283,6 +285,7 @@ class SeedCalculator(thrd.Thread):
                                        seed=seed, client_id=local_id)
                 submit_json = json.dumps(submit, indent=4, cls=CustomEncoder)
 
+                print(" [x] publishing solution " + submit_json)
                 self.channel.basic_publish(
                     exchange='', routing_key=solution_channel, body=submit_json)
 
