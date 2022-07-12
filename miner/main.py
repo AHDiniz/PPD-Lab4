@@ -228,7 +228,7 @@ class SeedCalculator(thrd.Thread):
         self.__id = id
         self.connection = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost'))
-        self.channel = connection.channel()
+        self.channel = self.connection.channel()
         self.channel.queue_declare(queue=init_channel)
         self.channel.queue_declare(queue=election_channel)
         self.channel.queue_declare(queue=challenge_channel)
