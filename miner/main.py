@@ -93,6 +93,7 @@ def return_connection():
 
 def callback_init(ch, method, properties, body):
     body = int(body)
+    print(" [x] callback_init: received %r" % body)
     if body not in clients:
         print("Client " + str(body) + " joined")
         clients.append(body)
@@ -111,17 +112,19 @@ def callback_challenge(ch, method, properties, body):
     global current_challenge
     print(" [x] callback_challenge: received %r" % body)
     current_challenge = json.loads(body.decode("utf-8"))
-    transaction_bo.add_transaction(current_challenge)
 
-    print("Transaction received " + str(current_challenge.transaction_id) +
-          " with challenge: " + str(current_challenge.challenge))
+    print("Transaction received " + str(current_challenge['transaction_id']) +
+          " with challenge: " + str(current_challenge['challenge']))
+    
+    transaction_bo.add_transaction(current_challenge)
 
 
 def callback_solution(ch, method, properties, body):
     body: SubmitPayload = json.loads(body.decode("utf-8"))
-    challenge_response = transaction_bo.get_challenge(body.transaction_id)
+    print(" [x] callback_solution: received %r" % body)
+    challenge_response = transaction_bo.get_challenge(body['transaction_id'])
     voting = VotingMsg(local_id, 0)
-    if(transaction_bo.verify_challenge(challenge_response.challenge, body.seed)):
+    if(transaction_bo.verify_challenge(challenge_response['challenge'], body['seed'])):
         print("Solution valid")
         voting.valid = 1
         global waiting_vote
@@ -133,6 +136,7 @@ def callback_solution(ch, method, properties, body):
 
 def callback_voting(ch, method, properties, body):
     body: VotingMsg = json.loads(body.decode("utf-8"))
+    print(" [x] callback_voting: received %r" % body)
     if not any(elem['id'] == body['id'] for elem in election):
         voting.append(body)
         print("Client " + str(body['client_id']) + " votes: " + str(body['valid']))
@@ -251,17 +255,16 @@ class SeedCalculator(thrd.Thread):
         transaction_id = -1
         while (True):
             global current_challenge
-            # print("SeedCalculator", self.__id, "current challenge :", current_challenge)
 
             # Wait for a challenge
             if (current_challenge is None or waiting_vote):
                 continue
 
             # Reset the counter
-            if (transaction_id != current_challenge.transaction_id):
+            if (transaction_id != current_challenge['transaction_id']):
                 start = perf_counter()
-                challenge = current_challenge.challenge
-                transaction_id = current_challenge.transaction_id
+                challenge = current_challenge['challenge']
+                transaction_id = current_challenge['transaction_id']
 
             # Calculate the seed
             seed = random.randint(0, 2000000000)
@@ -276,7 +279,7 @@ class SeedCalculator(thrd.Thread):
                 c.acquire()
 
                 # if someone else has already submitted the solution, we need to wait for them to finish and not submit again
-                if (current_challenge.transaction_id != transaction_id):
+                if (current_challenge['transaction_id'] != transaction_id):
                     c.release()
                     continue
                 current_challenge = None
@@ -284,8 +287,7 @@ class SeedCalculator(thrd.Thread):
                 submit = SubmitPayload(transaction_id=transaction_id,
                                        seed=seed, client_id=local_id)
                 submit_json = json.dumps(submit, indent=4, cls=CustomEncoder)
-
-                print(" [x] publishing solution " + submit_json)
+                
                 self.channel.basic_publish(
                     exchange='', routing_key=solution_channel, body=submit_json)
 
