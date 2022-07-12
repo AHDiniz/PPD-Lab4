@@ -14,10 +14,11 @@ class TransactionDAO:
         return cls._instance
 
     # add a transaction to the list of transactions
-    def create_transaction(self, challenge) -> None:
+    def create_transaction(self, challenge) -> Transaction:
         transaction = Transaction(
             self.get_last_transaction().transaction_id + 1, challenge, None, -1)
         self.add_transaction(transaction)
+        return transaction
 
     # get a transaction by id
     def get_transaction(self, transaction_id: int) -> Transaction:
