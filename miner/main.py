@@ -144,7 +144,6 @@ def callback_solution(ch, method, properties, body):
 def callback_voting(ch, method, properties, body):
     print(" [x] callback_voting: received %r" % body)
     body = json.loads(body.decode("utf-8"))
-    print(type(body))
 
     if not any(elem.id == body['id'] for elem in voting):
         voting.append(VotingMsg(**body))
