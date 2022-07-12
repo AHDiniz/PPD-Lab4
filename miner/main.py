@@ -79,6 +79,8 @@ def on_open(connection):
     print("opening connection")
     connection.channel(on_open_callback=on_channel_open)
 
+def on_close(connection,  reason):
+    print("Connection closed:", reason)
 
 connection = None
 
@@ -87,7 +89,8 @@ def return_connection():
     global connection
     if (connection is None or connection.is_closed):
         connection = pika.SelectConnection(parameters=pika.ConnectionParameters(host='localhost'),
-                                           on_open_callback=on_open)
+                                           on_open_callback=on_open,
+                                           on_close_callback=on_close )
     return connection
 
 
@@ -116,12 +119,12 @@ def callback_challenge(ch, method, properties, body):
     print("Transaction received " + str(current_challenge['transaction_id']) +
           " with challenge: " + str(current_challenge['challenge']))
     
-    transaction_bo.add_transaction(current_challenge)
+    # transaction_bo.add_transaction(Transaction(**current_challenge))
 
 
 def callback_solution(ch, method, properties, body):
-    body: SubmitPayload = json.loads(body.decode("utf-8"))
     print(" [x] callback_solution: received %r" % body)
+    body: SubmitPayload = json.loads(body.decode("utf-8"))
     challenge_response = transaction_bo.get_challenge(body['transaction_id'])
     voting = VotingMsg(local_id, 0)
     if(transaction_bo.verify_challenge(challenge_response['challenge'], body['seed'])):
@@ -146,9 +149,9 @@ def callback_voting(ch, method, properties, body):
         if (sum(elem.valid for elem in voting) > max_clients / 2):
             print("Solution valid")
             transaction = transaction_bo.get_transaction(
-                body.payload.transaction_id)
-            transaction.winner = body.client_id
-            transaction.seed = body.payload.seed
+                body.payload['transaction_id'])
+            transaction.winner = body['client_id']
+            transaction.seed = body.payload['seed']
 
             if (max(election, key=lambda x: x['vote'])['id'] == local_id):
                 transaction = transaction_bo.create_transaction()
@@ -165,8 +168,7 @@ def callback_voting(ch, method, properties, body):
 class Consumer(thrd.Thread):
     def __init__(self):
         thrd.Thread.__init__(self)
-        self.connection = pika.SelectConnection(parameters=pika.ConnectionParameters(host='localhost'),
-                                                on_open_callback=on_open)
+        self.connection = return_connection()
 
     def run(self):
         self.connection.ioloop.start()
@@ -287,7 +289,7 @@ class SeedCalculator(thrd.Thread):
                 submit = SubmitPayload(transaction_id=transaction_id,
                                        seed=seed, client_id=local_id)
                 submit_json = json.dumps(submit, indent=4, cls=CustomEncoder)
-                
+
                 self.channel.basic_publish(
                     exchange='', routing_key=solution_channel, body=submit_json)
 
@@ -313,7 +315,7 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print('Interrupted')
         try:
-            consumer.connection.close()
+            # consumer.connection.close()
             sys.exit(0)
         except SystemExit:
             os._exit(0)
