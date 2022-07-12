@@ -47,8 +47,8 @@ election: List[ElectionMsg] = []
 
 
 class VotingMsg:
-    def __init__(self, client_id: int, valid: int, payload: SubmitPayload) -> None:
-        self.client_id = client_id
+    def __init__(self, id: int, valid: int, payload: SubmitPayload) -> None:
+        self.id = id
         self.valid = valid
         self.payload = payload
 
@@ -126,37 +126,47 @@ def callback_solution(ch, method, properties, body):
     print(" [x] callback_solution: received %r" % body)
     body: SubmitPayload = json.loads(body.decode("utf-8"))
     challenge_response = transaction_bo.get_challenge(body['transaction_id'])
-    voting = VotingMsg(local_id, 0)
-    if(transaction_bo.verify_challenge(challenge_response['challenge'], body['seed'])):
+    voting = VotingMsg(local_id, 0, body)
+    if(transaction_bo.verify_challenge(challenge_response.challenge, body['seed'])):
         print("Solution valid")
         voting.valid = 1
         global waiting_vote
         waiting_vote = True
 
-    return_connection().channel().basic_publish(
-        exchange='', routing_key=voting_channel, body=json.dumps(voting, indent=4, cls=CustomEncoder))
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(host='localhost'))
+    channel = connection.channel()
+    channel.queue_declare(queue=voting_channel)
+    channel.basic_publish(
+        exchange='',  routing_key=voting_channel, body=json.dumps(voting, indent=4, cls=CustomEncoder))
 
 
 def callback_voting(ch, method, properties, body):
-    body: VotingMsg = json.loads(body.decode("utf-8"))
     print(" [x] callback_voting: received %r" % body)
-    if not any(elem['id'] == body['id'] for elem in election):
-        voting.append(body)
-        print("Client " + str(body['client_id']) + " votes: " + str(body['valid']))
+    body = json.loads(body.decode("utf-8"))
+    print(type(body))
+
+    if not any(elem.id == body['id'] for elem in voting):
+        voting.append(VotingMsg(**body))
+        print("Client " + str(body['id']) + " votes: " + str(body['valid']))
 
     if (len(voting) == max_clients):
         print("Voting finished")
         if (sum(elem.valid for elem in voting) > max_clients / 2):
             print("Solution valid")
             transaction = transaction_bo.get_transaction(
-                body.payload['transaction_id'])
-            transaction.winner = body['client_id']
-            transaction.seed = body.payload['seed']
+                body['payload']['transaction_id'])
+            transaction.winner = body['id']
+            transaction.seed = body['payload']['seed']
 
             if (max(election, key=lambda x: x['vote'])['id'] == local_id):
                 transaction = transaction_bo.create_transaction()
 
-                return_connection().channel().basic_publish(
+                connection = pika.BlockingConnection(
+                    pika.ConnectionParameters(host='localhost'))
+                channel = connection.channel()
+                channel.queue_declare(queue=challenge_channel)
+                channel.basic_publish(
                     exchange='', routing_key=challenge_channel, body=json.dumps(transaction, indent=4, cls=CustomEncoder))
         else:
             print("Solution invalid")
@@ -189,7 +199,7 @@ def main():
     while len(clients) < max_clients:
         print("Waiting for clients")
         channel.basic_publish(
-            exchange='', routing_key=init_channel, body=str(local_id))
+            exchange='',  routing_key=init_channel, body=str(local_id))
         time.sleep(2)
 
     # electing leader
@@ -200,7 +210,7 @@ def main():
     while len(election) < max_clients:
         print("Waiting for election")
         channel.basic_publish(
-            exchange='', routing_key=election_channel, body=json.dumps(vote, indent=4, cls=CustomEncoder))
+            exchange='',  routing_key=election_channel, body=json.dumps(vote, indent=4, cls=CustomEncoder))
         time.sleep(2)
 
     print("Election finished")
@@ -209,7 +219,7 @@ def main():
         print("I am the leader")
         transaction = transaction_bo.create_transaction()
         channel.basic_publish(
-            exchange='', routing_key=challenge_channel, body=json.dumps(transaction, indent=4, cls=CustomEncoder))
+            exchange='',  routing_key=challenge_channel, body=json.dumps(transaction, indent=4, cls=CustomEncoder))
 
     print("Running for client id: " + str(local_id))
 
@@ -291,7 +301,7 @@ class SeedCalculator(thrd.Thread):
                 submit_json = json.dumps(submit, indent=4, cls=CustomEncoder)
 
                 self.channel.basic_publish(
-                    exchange='', routing_key=solution_channel, body=submit_json)
+                    exchange='',  routing_key=solution_channel, body=submit_json)
 
                 end = perf_counter()
 
