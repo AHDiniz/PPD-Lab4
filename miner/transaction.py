@@ -1,7 +1,7 @@
 # define a class for transactions
 class Transaction:
     # constructor for the class
-    def __init__(self, transaction_id: int, challenge: int, seed: str, winner: int) -> None:
+    def __init__(self, transaction_id: int, challenge: int, seed: str, winner: int, *args, **kwargs) -> None:
         self.transaction_id = transaction_id
         self.challenge = challenge
         self.seed = seed

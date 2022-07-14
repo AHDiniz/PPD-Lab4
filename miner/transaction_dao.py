@@ -26,19 +26,11 @@ class TransactionDAO:
             if transaction.transaction_id == transaction_id:
                 return transaction
 
-    # update a transaction by id
-    def update_transaction(self, transaction_id: int, challenge: int, seed: str, winner: int) -> Transaction:
-        for transaction in transactions:
-            if transaction.transaction_id == transaction_id:
-                transaction.challenge = challenge
-                transaction.seed = seed
-                transaction.winner = winner
-                return transaction
-    
     # add transaction to the list of transactions
     def add_transaction(self, transaction: Transaction) -> None:
-        transactions.append(transaction)
-        self.print_transactions()
+        if (not any(elem.transaction_id == transaction.transaction_id for elem in transactions)):
+            transactions.append(transaction)
+            self.print_transactions()
 
     # get last transaction
     def get_last_transaction(self) -> Transaction:
