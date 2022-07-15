@@ -22,7 +22,7 @@ local_id = random.randint(1, 2000000000)
 clients: List[int] = []
 clients_lock = thrd.Condition()
 
-current_challenge: Transaction
+current_challenge: Transaction = None
 current_challenge_lock = thrd.Condition()
 
 waiting_vote = False
@@ -296,15 +296,18 @@ class SeedCalculator(thrd.Thread):
 
         while (True):
 
-            global current_challenge
             global waiting_vote
 
-            # Wait for a challenge
-            if (current_challenge is None or waiting_vote):
+            if (waiting_vote):
                 continue
 
             # Reset the counter
             if (count == 5000):
+                global current_challenge
+                # Wait for a challenge
+                if (current_challenge is None):
+                    continue
+                count = 0
                 current_challenge_lock.acquire()
                 if (not current_challenge or transaction_id != current_challenge.transaction_id):
                     start = perf_counter()
@@ -343,6 +346,7 @@ class SeedCalculator(thrd.Thread):
                     transaction_id, self.__id, self.__time_to_finish))
 
                 waiting_vote_lock.release()
+            count = count + 1
 
 
 threads: List[SeedCalculator] = []
