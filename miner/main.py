@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import random
 import sys
@@ -11,8 +10,8 @@ from typing import List
 import pika
 
 from custom_encoder import CustomEncoder
-from submit_status import SubmitStatus
 from submit_payload import SolutionMsg
+from submit_status import SubmitStatus
 from transaction import Transaction
 from transaction_bo import TransactionBO
 
@@ -143,14 +142,14 @@ class Consumer(thrd.Thread):
     def callback_init(self, ch, method, properties, body):
         body = int(body)
         if body not in clients:
-            LOGGER.info("Client " + str(body) + " joined")
+            print("Client " + str(body) + " joined")
             clients.append(body)
 
     def callback_election(self, ch, method, properties, body):
         body = json.loads(body.decode("utf-8"))
         body = ElectionMsg(**body)
         if not any(elem.id == body.id for elem in election):
-            LOGGER.info("Client " + str(body.id) +
+            print("Client " + str(body.id) +
                         " gets number: " + str(body.vote))
             election.append(body)
 
@@ -159,7 +158,7 @@ class Consumer(thrd.Thread):
         global current_challenge
         body = json.loads(body.decode("utf-8"))
 
-        LOGGER.info("Transaction " + str(body['transaction_id']) +
+        print("Transaction " + str(body['transaction_id']) +
                     " received with challenge: " + str(body['challenge']))
 
         transaction_bo.add_transaction(Transaction(**body))
@@ -189,17 +188,17 @@ class Consumer(thrd.Thread):
 
         if not any(elem.voter == voting_msg.voter for elem in self.voting):
             self.voting.append(voting_msg)
-            LOGGER.info("Client " + str(voting_msg.voter) +
+            print("Client " + str(voting_msg.voter) +
                         " votes: " + str(voting_msg.valid) +
                         " for transaction " + str(voting_msg.transaction_id) +
                         " with seed " + str(voting_msg.seed) +
                         " and challenger " + str(voting_msg.challenger))
 
         if (len(self.voting) == clients_needed):
-            LOGGER.info("Voting finished")
+            print("Voting finished")
             waiting_vote_lock.acquire()
             if (sum(elem.valid for elem in self.voting) > clients_needed / 2):
-                LOGGER.info("Solution valid")
+                print("Solution valid")
                 current_challenge_lock.acquire()
                 global current_challenge
                 current_challenge = None
@@ -218,7 +217,7 @@ class Consumer(thrd.Thread):
                 current_challenge_lock.release()
 
             else:
-                LOGGER.info("Solution invalid")
+                print("Solution invalid")
 
             self.voting = []
             global waiting_vote
@@ -231,38 +230,38 @@ class Consumer(thrd.Thread):
 
 def main():
 
-    LOGGER.info("To exit press CTRL+C")
-    LOGGER.info("Initializing miner for client " + str(local_id))
+    print("To exit press CTRL+C")
+    print("Initializing miner for client " + str(local_id))
     publisher = Publisher()
     channel = publisher.channel
     while len(clients) < clients_needed:
-        LOGGER.info("Waiting for clients")
+        print("Waiting for clients")
         channel.basic_publish(
             exchange=init_routing_key,  routing_key=init_routing_key, body=str(local_id))
         time.sleep(5)
 
-    LOGGER.info("System initialized")
+    print("System initialized")
 
     # electing leader
     vote = ElectionMsg(local_id, random.randint(1, 2000000000))
 
     while len(election) < clients_needed:
-        LOGGER.info("Waiting for election")
+        print("Waiting for election")
         channel.basic_publish(
             exchange=init_routing_key,  routing_key=init_routing_key, body=str(local_id))
         channel.basic_publish(
             exchange=election_routing_key,  routing_key=election_routing_key, body=json.dumps(vote, indent=4, cls=CustomEncoder))
         time.sleep(5)
 
-    LOGGER.info("Election finished")
+    print("Election finished")
 
     if (max(election, key=lambda x: x.vote).id == local_id):
-        LOGGER.info("I am the leader")
+        print("I am the leader")
         transaction = transaction_bo.create_transaction()
         channel.basic_publish(
             exchange=challenge_routing_key,  routing_key=challenge_routing_key, body=json.dumps(transaction, indent=4, cls=CustomEncoder))
 
-    LOGGER.info("Running for client id: " + str(local_id))
+    print("Running for client id: " + str(local_id))
 
     max_threads = 1
     for i in range(0, max_threads):
@@ -290,10 +289,13 @@ class SeedCalculator(thrd.Thread):
 
     def run(self):
 
-        LOGGER.info("SeedCalculator {} started".format(self.__id))
+        print("SeedCalculator {} started".format(self.__id))
         challenge = -1
         transaction_id = -1
+        count = 0
+
         while (True):
+
             global current_challenge
             global waiting_vote
 
@@ -302,10 +304,13 @@ class SeedCalculator(thrd.Thread):
                 continue
 
             # Reset the counter
-            if (not current_challenge or transaction_id != current_challenge.transaction_id):
-                start = perf_counter()
-                challenge = current_challenge.challenge
-                transaction_id = current_challenge.transaction_id
+            if (count == 5000):
+                current_challenge_lock.acquire()
+                if (not current_challenge or transaction_id != current_challenge.transaction_id):
+                    start = perf_counter()
+                    challenge = current_challenge.challenge
+                    transaction_id = current_challenge.transaction_id
+                current_challenge_lock.release()
 
             # Calculate the seed
             seed = random.randint(0, 2000000000)
@@ -334,7 +339,7 @@ class SeedCalculator(thrd.Thread):
 
                 self.__time_to_finish = end - start
                 start = perf_counter()
-                LOGGER.info("Solved transaction {} with thread {} in {} seconds".format(
+                print("Solved transaction {} with thread {} in {} seconds".format(
                     transaction_id, self.__id, self.__time_to_finish))
 
                 waiting_vote_lock.release()
@@ -342,10 +347,6 @@ class SeedCalculator(thrd.Thread):
 
 threads: List[SeedCalculator] = []
 
-LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
-              '-35s %(lineno) -5d: %(message)s')
-LOGGER = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
 
 if __name__ == '__main__':
     try:
@@ -365,7 +366,7 @@ if __name__ == '__main__':
             s.publisher.connection.close()
 
     except KeyboardInterrupt:
-        LOGGER.info('Interrupted')
+        print('Interrupted')
         try:
             for s in threads:
                 s.publisher.channel.close()
