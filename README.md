@@ -38,9 +38,9 @@ Abaixo temos a descrição dos exchanges utilizados e das mensagens enviadas.
 ### Exchanges Declarados
 | Exchange        | Descrição                      |
 |:----------------|:---------------------------------|
-| miner/init      | O cliente envia o seu id gerado localmente para conhecimento dos outros clientes. Todos os então clientes adicionam o id na sua cópia local. |
-| miner/election  | Cada um dos clientes envia o seu id e um número de voto para eleição do líder. Todos os clientes escolhem o cliente com maior voto e maior id para adicionar como líder  |
-| miner/challenge | O Líder então gera e envia a transação, todos os clientes atualizam a lista local de transações com o objeto enviado e começam a tentar solucionar o mesmo |
+| miner/init      | O cliente envia o seu id gerado localmente para conhecimento dos outros clientes. Todos os então clientes adicionam o id na sua cópia local. Todos os clientes reenviam a mensagem até que tenham todos os clientes na sua cópia local. |
+| miner/election  | Cada um dos clientes envia o seu id e um número de voto para eleição do líder. Todos os clientes escolhem o cliente com maior voto e maior id para adicionar como líder. Todos os clientes reenviam o voto e sua mensagem de cliente enquanto não receber todos os votos. |
+| miner/challenge | O Líder então gera e envia a transação, todos os clientes atualizam a lista local de transações com o objeto enviado e começam a tentar solucionar o mesmo com um número configurável de threads. |
 | miner/solution  | O cliente que solucionar localmente envia a solução para todos os clientes. Todos os clientes então verificam a solução e esperam o resultado de miner/voting caso tenham concordado com a solução, caso contrário, continuam procurando a solução  |
 | miner/voting    | Todos os clientes enviam o seu voto definido no subscribe da miner/solution. Ao receber todos os votos, cada cópia verifica se a maioria aceitou a solução, caso seja aceitado, o líder gera um novo desafio, caso contrário todos continuam procurando a solução da transação atual  |
 
