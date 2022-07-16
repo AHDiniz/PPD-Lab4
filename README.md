@@ -33,10 +33,59 @@ Caso você esteja usando python, pode modificar o script para rodar o comando py
 
 ## Mensagens e Exchanges Utilizados
 
-| Parâmetro | Tipo | Descrição |
-|:----------|:---------------------|:---------------|
-| App 1     | Description text 1.  | Requirements 1 |
-| App 2     | Description text 2.  | None           |
+Abaixo temos a descrição dos exchanges utilizados e das mensagens enviadas.
+
+### Exchanges Declarados
+| Exchange        | Descrição                      |
+|:----------------|:---------------------------------|
+| miner/init      | O cliente envia o seu id gerado localmente para conhecimento dos outros clientes. Todos os então clientes adicionam o id na sua cópia local. |
+| miner/election  | Cada um dos clientes envia o seu id e um número de voto para eleição do líder. Todos os clientes escolhem o cliente com maior voto e maior id para adicionar como líder  |
+| miner/challenge | O Líder então gera e envia a transação, todos os clientes atualizam a lista local de transações com o objeto enviado e começam a tentar solucionar o mesmo |
+| miner/solution  | O cliente que solucionar localmente envia a solução para todos os clientes. Todos os clientes então verificam a solução e esperam o resultado de miner/voting caso tenham concordado com a solução, caso contrário, continuam procurando a solução  |
+| miner/voting    | Todos os clientes enviam o seu voto definido no subscribe da miner/solution. Ao receber todos os votos, cada cópia verifica se a maioria aceitou a solução, caso seja aceitado, o líder gera um novo desafio, caso contrário todos continuam procurando a solução da transação atual  |
+
+### Mensagem e seus bodys
+
+#### miner/init
+
+| Propriedade | Tipo | Descrição                                      |
+|:------------|:-----|:-----------------------------------------------|
+| id          | int  | Id gerado pelo cliente que publicou a mensagem |
+
+
+#### miner/election
+
+| Propriedade | Tipo | Descrição                                                                                             |
+|:------------|:-----|:------------------------------------------------------------------------------------------------------|
+| id          | int  | Id gerado pelo cliente que publicou a mensagem identificando o seu voto                               |
+| vote        | int  | Número gerado aleatoriamente pelo cliente que publicou a mensagem, identifica o seu voto para eleição |
+
+#### miner/challenge
+
+| Propriedade    | Tipo | Descrição                           |
+|:---------------|:-----|:------------------------------------|
+| transaction_id | int  | id da transação                     |
+| challenge      | int  | Dificuldade do desafio              |
+| generator_id   | int  | id do cliente que gerou a transação |
+
+#### miner/solution
+
+| Propriedade    | Tipo | Descrição                          |
+|:---------------|:-----|:-----------------------------------|
+| transaction_id | int  | id da transação                    |
+| seed           | int  | Seed utilizada                     |
+| client         | int  | id do cliente que enviou a solução |
+
+#### miner/voting
+
+| Propriedade    | Tipo | Descrição                          |
+|:---------------|:-----|:-----------------------------------|
+| voter          | int  | id do cliente enviando o voto      |
+| valid          | int  | voto do cliente                    |
+| transaction_id | int  | id da transação                    |
+| seed           | int  | Seed utilizada                     |
+| challenger     | int  | id do cliente que enviou a solução |
+
 
 ## Sobre o [RabbitMQ&trade;](https://www.rabbitmq.com/)
 
