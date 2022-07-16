@@ -13,9 +13,9 @@ class TransactionBO:
         self.transaction_dao = TransactionDAO()
 
     # Create transaction
-    def create_transaction(self) -> Transaction:
+    def create_transaction(self, generator_id: int) -> Transaction:
         transaction = self.transaction_dao.create_transaction(
-            random.randint(1, 128))
+            random.randint(15, 20), generator_id)
         return transaction
 
     def add_transaction(self, transaction: Transaction) -> None:
@@ -23,6 +23,9 @@ class TransactionBO:
 
     def get_transaction(self, id) -> Transaction:
         return self.transaction_dao.get_transaction(id)
+
+    def get_current_transaction(self) -> Transaction:
+        return self.transaction_dao.get_last_transaction()
 
     # submit a seed for the transaction given by id and return if it is valid or not, -1 if not found
     def validate_challenge(self, submit_payload: SolutionMsg) -> SubmitStatus:

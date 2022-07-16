@@ -1,6 +1,8 @@
 from typing import List
-from transaction import Transaction
+
 from tabulate import tabulate
+
+from transaction import Transaction
 
 transactions: List[Transaction] = []
 
@@ -14,9 +16,10 @@ class TransactionDAO:
         return cls._instance
 
     # add a transaction to the list of transactions
-    def create_transaction(self, challenge) -> Transaction:
+    def create_transaction(self, challenge, generator_id) -> Transaction:
         transaction = Transaction(
-            self.get_last_transaction().transaction_id + 1, challenge, None, -1)
+            self.get_last_transaction().transaction_id + 1, challenge, None, -1, generator_id)
+
         self.add_transaction(transaction)
         return transaction
 
@@ -35,11 +38,11 @@ class TransactionDAO:
     # get last transaction
     def get_last_transaction(self) -> Transaction:
         if len(transactions) == 0:
-            return Transaction(-1, 0, None, -1)  # default transaction
+            return Transaction(-1, 0, None, -1, -1)  # default transaction
 
         return transactions[-1]
 
     # print all transactions
     def print_transactions(self) -> None:
-        print(tabulate([[transaction.transaction_id, transaction.challenge, transaction.seed, transaction.winner]
-              for transaction in transactions], headers=['transaction_id', 'challenge', 'seed', 'winner'], tablefmt='fancy_grid'))
+        print(tabulate([[transaction.transaction_id, transaction.challenge, transaction.seed, transaction.winner, transaction.generator_id]
+              for transaction in transactions], headers=['Transaction ID', 'Challenge', 'Seed', 'Winner', 'Generator Client'], tablefmt='fancy_grid'))
