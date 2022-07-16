@@ -33,6 +33,10 @@ Caso você esteja usando python, pode modificar o script para rodar o comando py
 
 ## Mensagens e Exchanges Utilizados
 
+| Parâmetro | Tipo | Descrição |
+|:----------|:---------------------|:---------------|
+| App 1     | Description text 1.  | Requirements 1 |
+| App 2     | Description text 2.  | None           |
 
 ## Sobre o [RabbitMQ&trade;](https://www.rabbitmq.com/)
 
